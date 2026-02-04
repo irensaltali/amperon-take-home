@@ -18,7 +18,7 @@ Implementation Roadmap Summary
                       3.2    feat/client/tomorrow-api-client         Tomorrow.io API client          ✅ Done
                       3.3    feat/etl/pipeline-orchestrator          ETL pipeline                    ✅ Done
                       3.4    feat/ci/github-actions                  GitHub Actions + checks         ✅ Done
-   4. Observability   4.1    feat/observability/structured-logging   structlog JSON logging to stdout
+   4. Observability   4.1    feat/observability/structured-logging   structlog JSON logging              ✅ Done
    5. Scheduling      5.1    feat/scheduler/apscheduler              APScheduler hourly runs
                       5.2    feat/app/main-entry-point               __main__.py entry point
                       5.3    feat/docker/compose-updates             Docker compose with migrations
@@ -85,7 +85,14 @@ Implementation Roadmap Summary
      - Docker build and push workflow
      - PR template and branch protection documentation
 
-  Next Step: 4.1 feat/observability/structured-logging
+  ✅ 4.1 feat/observability/structured-logging
+     - configure_logging() with JSON and console output modes
+     - get_logger() for structured logging instances
+     - Helper functions: log_metric(), log_pipeline_start(), log_pipeline_complete()
+     - API and DB operation logging helpers
+     - 12 comprehensive tests
+
+  Next Step: 5.1 feat/scheduler/apscheduler
 
   Observability: Option A - Structured Logging
 
