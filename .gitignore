@@ -208,12 +208,3 @@ __marimo__/
 
 # Mac specific files
 .DS_Store
-
-# Planning documents - do not commit
-PLAN.md
-Sequential Steps.md
-IMPLEMENTATION_PLAN.md
-
-# Docs directory (temporary guides)
-docs/
-
