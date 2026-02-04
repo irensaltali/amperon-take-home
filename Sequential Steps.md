@@ -19,7 +19,7 @@ Implementation Roadmap Summary
                       3.3    feat/etl/pipeline-orchestrator          ETL pipeline                    ✅ Done
                       3.4    feat/ci/github-actions                  GitHub Actions + checks         ✅ Done
    4. Observability   4.1    feat/observability/structured-logging   structlog JSON logging              ✅ Done
-   5. Scheduling      5.1    feat/scheduler/apscheduler              APScheduler hourly runs
+   5. Scheduling      5.1    feat/scheduler/apscheduler              APScheduler hourly runs          ✅ Done
                       5.2    feat/app/main-entry-point               __main__.py entry point
                       5.3    feat/docker/compose-updates             Docker compose with migrations
    6. Testing         6.1    feat/tests/e2e-and-audit                E2E Testing & Final Audit
@@ -92,7 +92,16 @@ Implementation Roadmap Summary
      - API and DB operation logging helpers
      - 12 comprehensive tests
 
-  Next Step: 5.1 feat/scheduler/apscheduler
+  ✅ 5.1 feat/scheduler/apscheduler
+     - BackgroundScheduler with thread pool executor
+     - Hourly job scheduling (configurable minute)
+     - Minutely job scheduling (configurable interval)
+     - Job event listeners for logging
+     - Signal handlers for graceful shutdown
+     - Status reporting and manual job triggering
+     - 16 comprehensive tests
+
+  Next Step: 5.2 feat/app/main-entry-point
 
   Observability: Option A - Structured Logging
 
