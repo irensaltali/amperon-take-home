@@ -1,7 +1,4 @@
-version: '3'
-
 services:
-
   postgres:
     image: 'postgres:16.2@sha256:6b841c8f6a819884207402f1209a8116844365df15fca8cf556fc54a24c70800'
     ports:
@@ -11,30 +8,61 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: tomorrow
     volumes:
-      - "${PWD}/scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql"
       - "pgdata:/var/lib/postgresql/data"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}" ]
-      interval: 1s
-      timeout: 20s
-      retries: 20
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
 
   tomorrow:
     build:
       context: .
       dockerfile: Dockerfile
-    command: python -m tomorrow
+    command: python -m tomorrow scheduler
+    environment:
+      TOMORROW_API_KEY: ${TOMORROW_API_KEY}
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: tomorrow
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "python -c 'from tomorrow.db import health_check; exit(0 if health_check() else 1)'" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  tomorrow-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m tomorrow migrate
     environment:
       PGHOST: postgres
       PGPORT: 5432
       PGUSER: postgres
       PGPASSWORD: postgres
       PGDATABASE: tomorrow
-    volumes:
-      - "${PWD}/blobs:/tmp/blobs"
     depends_on:
       postgres:
         condition: service_healthy
+    profiles:
+      - migrate
+    restart: "no"
 
   jupyter:
     build:
@@ -54,6 +82,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    profiles:
+      - jupyter
+    restart: unless-stopped
 
 volumes:
   pgdata:
