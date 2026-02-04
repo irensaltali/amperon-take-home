@@ -6,11 +6,11 @@ for locations and weather data.
 
 import logging
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Optional, Tuple
 
 import psycopg2
-from psycopg2 import sql
+
 from psycopg2.extras import RealDictCursor, execute_values
 from psycopg2.pool import SimpleConnectionPool
 
