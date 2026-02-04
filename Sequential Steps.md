@@ -78,7 +78,7 @@ Implementation Roadmap Summary
      - Convenience functions: run_hourly_pipeline(), run_minutely_pipeline()
      - 15 comprehensive tests
 
-  Next Step: 4.1 feat/observability/structured-logging
+  Next Step: 3.4 feat/ci/github-actions
 
   Observability: Option A - Structured Logging
 
