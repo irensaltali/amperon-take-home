@@ -25,15 +25,15 @@ _connection_pool: Optional[SimpleConnectionPool] = None
 
 def get_connection_pool() -> SimpleConnectionPool:
     """Get or create the database connection pool.
-    
+
     Uses a singleton pattern to ensure only one pool exists.
     The pool is thread-safe and handles concurrent requests.
-    
+
     Returns:
         SimpleConnectionPool instance
     """
     global _connection_pool
-    
+
     if _connection_pool is None:
         settings = get_settings()
         try:
@@ -58,19 +58,19 @@ def get_connection_pool() -> SimpleConnectionPool:
                 f"database_pool_creation_failed host={settings.pg_host} port={settings.pg_port}: {e}"
             )
             raise
-    
+
     return _connection_pool
 
 
 @contextmanager
 def get_connection():
     """Context manager for database connections.
-    
+
     Automatically returns the connection to the pool when done.
-    
+
     Yields:
         Database connection object
-        
+
     Example:
         with get_connection() as conn:
             with conn.cursor() as cur:
@@ -95,12 +95,12 @@ def get_connection():
 @contextmanager
 def get_cursor():
     """Context manager for database cursors.
-    
+
     Combines get_connection() with cursor creation for convenience.
-    
+
     Yields:
         Database cursor object with RealDictCursor factory
-        
+
     Example:
         with get_cursor() as cur:
             cur.execute("SELECT * FROM locations")
@@ -113,7 +113,7 @@ def get_cursor():
 
 def close_all_connections() -> None:
     """Close all connections in the pool.
-    
+
     Useful for cleanup during application shutdown or testing.
     """
     global _connection_pool
@@ -130,13 +130,13 @@ def close_all_connections() -> None:
 
 def get_active_locations() -> List[Location]:
     """Fetch all active locations from the database.
-    
+
     Returns locations that are marked as active for data collection.
     Locations are ordered by ID for consistent results.
-    
+
     Returns:
         List of Location objects
-        
+
     Raises:
         psycopg2.Error: If database query fails
     """
@@ -150,20 +150,20 @@ def get_active_locations() -> List[Location]:
             """
         )
         rows = cur.fetchall()
-        
+
         locations = [Location.model_validate(dict(row)) for row in rows]
-        
+
         logger.info(f"locations_fetched count={len(locations)}")
-        
+
         return locations
 
 
 def get_location_by_id(location_id: int) -> Optional[Location]:
     """Fetch a single location by ID.
-    
+
     Args:
         location_id: The location ID to fetch
-        
+
     Returns:
         Location object if found, None otherwise
     """
@@ -174,10 +174,10 @@ def get_location_by_id(location_id: int) -> Optional[Location]:
             FROM locations
             WHERE id = %s
             """,
-            (location_id,)
+            (location_id,),
         )
         row = cur.fetchone()
-        
+
         if row:
             return Location.model_validate(dict(row))
         return None
@@ -185,11 +185,11 @@ def get_location_by_id(location_id: int) -> Optional[Location]:
 
 def get_location_by_coordinates(lat: float, lon: float) -> Optional[Location]:
     """Fetch a location by its coordinates.
-    
+
     Args:
         lat: Latitude coordinate
         lon: Longitude coordinate
-        
+
     Returns:
         Location object if found, None otherwise
     """
@@ -200,10 +200,10 @@ def get_location_by_coordinates(lat: float, lon: float) -> Optional[Location]:
             FROM locations
             WHERE lat = %s AND lon = %s
             """,
-            (lat, lon)
+            (lat, lon),
         )
         row = cur.fetchone()
-        
+
         if row:
             return Location.model_validate(dict(row))
         return None
@@ -216,23 +216,23 @@ def get_location_by_coordinates(lat: float, lon: float) -> Optional[Location]:
 
 def insert_readings(readings: List[WeatherReading]) -> int:
     """Insert weather readings into the database.
-    
+
     Uses UPSERT (ON CONFLICT DO UPDATE) to handle duplicate entries.
     This makes the operation idempotent - safe to re-run.
-    
+
     Args:
         readings: List of WeatherReading objects to insert
-        
+
     Returns:
         Number of rows inserted/updated
-        
+
     Raises:
         psycopg2.Error: If database operation fails
     """
     if not readings:
         logger.info("insert_readings_empty_list")
         return 0
-    
+
     # Prepare data for bulk insert
     # Column order must match the INSERT statement
     data = [
@@ -257,7 +257,7 @@ def insert_readings(readings: List[WeatherReading]) -> int:
         )
         for r in readings
     ]
-    
+
     with get_cursor() as cur:
         # Use execute_values for efficient bulk insert
         execute_values(
@@ -290,27 +290,25 @@ def insert_readings(readings: List[WeatherReading]) -> int:
             data,
             page_size=1000,  # Process in batches for large inserts
         )
-        
+
         rowcount = cur.rowcount
-        
+
         logger.info(
             f"readings_inserted count={rowcount} location_id={readings[0].location_id if readings else None}"
         )
-        
+
         return rowcount
 
 
-def get_latest_by_location(
-    granularity: str = "hourly"
-) -> List[LocationSummary]:
+def get_latest_by_location(granularity: str = "hourly") -> List[LocationSummary]:
     """Get the latest weather reading for each location.
-    
+
     This answers the assignment question:
     "What's the latest temperature for each geolocation? What's the latest wind speed?"
-    
+
     Args:
         granularity: Data granularity (minutely, hourly, daily)
-        
+
     Returns:
         List of LocationSummary objects with latest readings
     """
@@ -332,14 +330,16 @@ def get_latest_by_location(
               AND l.is_active = TRUE
             ORDER BY l.id, w.timestamp DESC
             """,
-            (granularity,)
+            (granularity,),
         )
         rows = cur.fetchall()
-        
+
         summaries = [LocationSummary.model_validate(dict(row)) for row in rows]
-        
-        logger.info(f"latest_readings_fetched count={len(summaries)} granularity={granularity}")
-        
+
+        logger.info(
+            f"latest_readings_fetched count={len(summaries)} granularity={granularity}"
+        )
+
         return summaries
 
 
@@ -347,19 +347,19 @@ def get_time_series(
     location_id: int,
     start_time: datetime,
     end_time: datetime,
-    granularity: str = "hourly"
+    granularity: str = "hourly",
 ) -> List[WeatherReading]:
     """Get time series weather data for a location.
-    
+
     This answers the assignment question:
     "Show an hourly time series of temperature from a day ago to 5 days in the future"
-    
+
     Args:
         location_id: The location ID to query
         start_time: Start of time range (inclusive)
         end_time: End of time range (inclusive)
         granularity: Data granularity (minutely, hourly, daily)
-        
+
     Returns:
         List of WeatherReading objects ordered by timestamp
     """
@@ -390,30 +390,29 @@ def get_time_series(
               AND timestamp BETWEEN %s AND %s
             ORDER BY timestamp ASC
             """,
-            (location_id, granularity, start_time, end_time)
+            (location_id, granularity, start_time, end_time),
         )
         rows = cur.fetchall()
-        
+
         readings = [WeatherReading.model_validate(dict(row)) for row in rows]
-        
+
         logger.info(
             f"time_series_fetched location_id={location_id} granularity={granularity} "
             f"start={start_time.isoformat()} end={end_time.isoformat()} count={len(readings)}"
         )
-        
+
         return readings
 
 
 def get_data_availability(
-    location_id: int,
-    granularity: str = "hourly"
+    location_id: int, granularity: str = "hourly"
 ) -> Tuple[Optional[datetime], Optional[datetime]]:
     """Get the time range of available data for a location.
-    
+
     Args:
         location_id: The location ID to query
         granularity: Data granularity
-        
+
     Returns:
         Tuple of (earliest_timestamp, latest_timestamp) or (None, None) if no data
     """
@@ -427,10 +426,10 @@ def get_data_availability(
             WHERE location_id = %s
               AND data_granularity = %s
             """,
-            (location_id, granularity)
+            (location_id, granularity),
         )
         row = cur.fetchone()
-        
+
         if row and row["earliest"]:
             return (row["earliest"], row["latest"])
         return (None, None)
@@ -443,7 +442,7 @@ def get_data_availability(
 
 def health_check() -> bool:
     """Check database connectivity.
-    
+
     Returns:
         True if database is reachable, False otherwise
     """
