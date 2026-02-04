@@ -58,15 +58,19 @@ def configure_logging(
 
     if json_format:
         # JSON output for production (Docker)
-        processors.extend([
-            # Render as JSON
-            structlog.processors.JSONRenderer(),
-        ])
+        processors.extend(
+            [
+                # Render as JSON
+                structlog.processors.JSONRenderer(),
+            ]
+        )
     else:
         # Pretty console output for development
-        processors.extend([
-            structlog.dev.ConsoleRenderer(),
-        ])
+        processors.extend(
+            [
+                structlog.dev.ConsoleRenderer(),
+            ]
+        )
 
     # Configure structlog
     structlog.configure(
@@ -81,12 +85,14 @@ def configure_logging(
 
     # Redirect standard library logging through structlog
     handler = logging.StreamHandler(sys.stdout)
-    
+
     # Use a simple formatter that works with both JSON and console output
     if json_format:
         handler.setFormatter(logging.Formatter("%(message)s"))
     else:
-        handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+        )
 
     # Update root logger
     root_logger = logging.getLogger()
