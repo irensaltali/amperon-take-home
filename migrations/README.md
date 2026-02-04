@@ -8,23 +8,41 @@ Migration files should be named with a sequential number prefix:
 
 ```
 001_create_locations_table.sql
+001_create_locations_table.rollback.sql
 002_insert_default_locations.sql
-003_create_weather_data_table.sql
+002_insert_default_locations.rollback.sql
 ```
 
 ## Migration File Format
 
-Each migration file must have two sections:
+Each migration consists of two files:
+1. `.sql` - Contains the forward migration (apply)
+2. `.rollback.sql` - Contains the rollback migration (optional but recommended)
 
+### Example Migration
+
+**001_create_locations_table.sql**:
 ```sql
--- step:
-CREATE TABLE example (
+--
+-- Migration: Create locations table
+-- Description: What this migration does
+--
+
+CREATE TABLE locations (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100)
 );
 
--- step_back:
-DROP TABLE IF EXISTS example;
+CREATE INDEX idx_name ON locations(name);
+```
+
+**001_create_locations_table.rollback.sql**:
+```sql
+--
+-- Rollback: Drop locations table
+--
+
+DROP TABLE IF EXISTS locations CASCADE;
 ```
 
 ## Running Migrations
@@ -65,3 +83,11 @@ Migrations use the following environment variables:
 - `PGDATABASE` - Database name (default: tomorrow)
 - `PGUSER` - Database user (default: postgres)
 - `PGPASSWORD` - Database password (default: postgres)
+
+## Migration Principles
+
+1. **One change per migration** - Each migration should make a single logical change
+2. **Always provide rollback** - Every migration should have a corresponding `.rollback.sql` file
+3. **Immutable history** - Never modify existing migration files after they've been applied
+4. **Idempotent operations** - Use `IF NOT EXISTS`, `IF EXISTS` where possible
+5. **Test your rollbacks** - Always test that rollbacks work correctly
