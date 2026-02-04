@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ETLResult:
     """Result of an ETL pipeline run.
-    
+
     Attributes:
         locations_processed: Number of locations successfully processed
         readings_inserted: Number of weather readings inserted/updated
@@ -37,6 +37,7 @@ class ETLResult:
         started_at: Pipeline start timestamp
         completed_at: Pipeline completion timestamp
     """
+
     locations_processed: int
     readings_inserted: int
     locations_failed: int
@@ -44,12 +45,12 @@ class ETLResult:
     duration_seconds: float
     started_at: datetime
     completed_at: datetime
-    
+
     @property
     def success(self) -> bool:
         """True if all locations were processed successfully."""
         return self.locations_failed == 0
-    
+
     @property
     def total_locations(self) -> int:
         """Total number of locations attempted."""
@@ -62,23 +63,23 @@ def transform_timeline_to_readings(
     granularity: str = "hourly",
 ) -> List[WeatherReading]:
     """Transform API timeline response to WeatherReading models.
-    
+
     Args:
         location: The location for this data
         response: API response with timelines
         granularity: Data granularity (minutely, hourly, daily)
-        
+
     Returns:
         List of WeatherReading models ready for database insertion
     """
     readings = []
-    
+
     # Get the appropriate timeline
     timeline = response.timelines.get(granularity, [])
-    
+
     for entry in timeline:
         values = entry.values
-        
+
         reading = WeatherReading(
             location_id=location.id,
             timestamp=entry.time,
@@ -116,12 +117,12 @@ def transform_timeline_to_readings(
             data_granularity=granularity,
         )
         readings.append(reading)
-    
+
     logger.debug(
         f"transformed_readings location_id={location.id} "
         f"granularity={granularity} count={len(readings)}"
     )
-    
+
     return readings
 
 
@@ -134,9 +135,9 @@ def run_etl_pipeline(
     locations: Optional[List[Location]] = None,
 ) -> ETLResult:
     """Run the complete ETL pipeline.
-    
+
     This is the main entry point for weather data ingestion.
-    
+
     Args:
         client: Tomorrow.io API client (created if not provided)
         granularity: Data granularity (minutely, hourly, daily)
@@ -144,20 +145,20 @@ def run_etl_pipeline(
         start_time: Start of time range (defaults to now)
         end_time: End of time range (defaults to 5 days from now)
         locations: Specific locations to process (defaults to all active)
-        
+
     Returns:
         ETLResult with statistics and error information
-        
+
     Example:
         # Run with default settings (hourly data for all locations)
         result = run_etl_pipeline()
-        
+
         # Run for specific time range
         result = run_etl_pipeline(
             start_time=datetime.now(timezone.utc) - timedelta(days=1),
             end_time=datetime.now(timezone.utc) + timedelta(days=5),
         )
-        
+
         # Check results
         if result.success:
             print(f"Inserted {result.readings_inserted} readings")
@@ -165,30 +166,30 @@ def run_etl_pipeline(
             print(f"Failed: {result.errors}")
     """
     started_at = datetime.now(timezone.utc)
-    
+
     # Initialize counters
     locations_processed = 0
     readings_inserted = 0
     locations_failed = 0
     errors = []
-    
+
     # Create client if not provided
     client_created = False
     if client is None:
         client = TomorrowClient()
         client_created = True
-    
+
     try:
         # ======================================================================
         # EXTRACT: Load locations and fetch weather data
         # ======================================================================
-        
+
         # Load locations from database if not provided
         if locations is None:
             logger.info("loading_active_locations_from_db")
             locations = get_active_locations()
             logger.info(f"loaded_locations count={len(locations)}")
-        
+
         if not locations:
             logger.warning("no_locations_to_process")
             completed_at = datetime.now(timezone.utc)
@@ -202,41 +203,41 @@ def run_etl_pipeline(
                 started_at=started_at,
                 completed_at=completed_at,
             )
-        
+
         # Calculate default time range if not provided
         # Default: from -1 day to +5 days (6 days total)
         if start_time is None:
             start_time = started_at - timedelta(days=1)
         if end_time is None:
             end_time = started_at + timedelta(days=5)
-        
+
         # Format times for API
         start_time_str = start_time.strftime("%Y-%m-%dT%H:%M:%SZ")
         end_time_str = end_time.strftime("%Y-%m-%dT%H:%M:%SZ")
-        
+
         logger.info(
             f"etl_pipeline_started locations={len(locations)} "
             f"granularity={granularity} timesteps={timesteps} "
             f"start={start_time_str} end={end_time_str}"
         )
-        
+
         # Fetch weather data for all locations
         all_readings: List[WeatherReading] = []
-        
+
         for location in locations:
             try:
                 logger.debug(
                     f"fetching_weather location_id={location.id} "
                     f"lat={location.lat} lon={location.lon}"
                 )
-                
+
                 response = client.fetch_weather(
                     location=location,
                     timesteps=timesteps,
                     start_time=start_time_str,
                     end_time=end_time_str,
                 )
-                
+
                 # ======================================================================
                 # TRANSFORM: Convert API response to database models
                 # ======================================================================
@@ -245,15 +246,15 @@ def run_etl_pipeline(
                     response=response,
                     granularity=granularity,
                 )
-                
+
                 all_readings.extend(readings)
                 locations_processed += 1
-                
+
                 logger.debug(
                     f"transformed_readings location_id={location.id} "
                     f"count={len(readings)}"
                 )
-                
+
             except TomorrowAPIError as e:
                 locations_failed += 1
                 error_msg = f"API error for location {location.id}: {e}"
@@ -268,11 +269,11 @@ def run_etl_pipeline(
                 logger.error(error_msg)
                 # Continue with other locations
                 continue
-        
+
         # ======================================================================
         # LOAD: Insert readings into database
         # ======================================================================
-        
+
         if all_readings:
             try:
                 logger.info(f"inserting_readings count={len(all_readings)}")
@@ -285,21 +286,21 @@ def run_etl_pipeline(
                 logger.error(error_msg)
         else:
             logger.warning("no_readings_to_insert")
-        
+
     except Exception as e:
         error_msg = f"Pipeline failed: {e}"
         errors.append(error_msg)
         logger.error(error_msg)
-        
+
     finally:
         # Clean up client if we created it
         if client_created:
             client.close()
-    
+
     # Calculate duration
     completed_at = datetime.now(timezone.utc)
     duration_seconds = (completed_at - started_at).total_seconds()
-    
+
     # Log completion
     log_level = logging.INFO if locations_failed == 0 else logging.WARNING
     logger.log(
@@ -308,9 +309,9 @@ def run_etl_pipeline(
         f"locations_processed={locations_processed} "
         f"locations_failed={locations_failed} "
         f"readings_inserted={readings_inserted} "
-        f"duration_seconds={duration_seconds:.2f}"
+        f"duration_seconds={duration_seconds:.2f}",
     )
-    
+
     return ETLResult(
         locations_processed=locations_processed,
         readings_inserted=readings_inserted,
@@ -324,10 +325,10 @@ def run_etl_pipeline(
 
 def run_hourly_pipeline() -> ETLResult:
     """Run the standard hourly pipeline.
-    
+
     Convenience function for scheduled execution.
     Fetches hourly data for the default time range (-1 day to +5 days).
-    
+
     Returns:
         ETLResult with pipeline statistics
     """
@@ -339,10 +340,10 @@ def run_hourly_pipeline() -> ETLResult:
 
 def run_minutely_pipeline() -> ETLResult:
     """Run the minutely pipeline.
-    
+
     Convenience function for high-frequency data collection.
     Fetches minutely data for the default time range.
-    
+
     Returns:
         ETLResult with pipeline statistics
     """
