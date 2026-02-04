@@ -16,8 +16,7 @@ Implementation Roadmap Summary
                       2.2    feat/models/api-pydantic-models         Pydantic models (API JSON)      ✅ Done
    3. Core            3.1    feat/db/database-layer                  DB operations (locations)       ✅ Done
                       3.2    feat/client/tomorrow-api-client         Tomorrow.io API client          ✅ Done
-                      3.3    feat/etl/pipeline-orchestrator          ETL pipeline                    🔄 Next
-                      3.3    feat/etl/pipeline-orchestrator          ETL pipeline
+                      3.3    feat/etl/pipeline-orchestrator          ETL pipeline                    ✅ Done
                       3.4    feat/ci/github-actions                  GitHub Actions + checks
    4. Observability   4.1    feat/observability/structured-logging   structlog JSON logging to stdout
    5. Scheduling      5.1    feat/scheduler/apscheduler              APScheduler hourly runs
@@ -71,7 +70,15 @@ Implementation Roadmap Summary
      - Batch fetching for multiple locations
      - 20 comprehensive tests
 
-  Next Step: 3.3 feat/etl/pipeline-orchestrator
+  ✅ 3.3 feat/etl/pipeline-orchestrator
+     - ETLResult dataclass for pipeline statistics
+     - transform_timeline_to_readings() for data transformation
+     - run_etl_pipeline() with full EXTRACT-TRANSFORM-LOAD flow
+     - Error handling with partial failure support
+     - Convenience functions: run_hourly_pipeline(), run_minutely_pipeline()
+     - 15 comprehensive tests
+
+  Next Step: 3.4 feat/ci/github-actions
 
   Observability: Option A - Structured Logging
 
