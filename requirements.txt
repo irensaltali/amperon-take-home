@@ -1,2 +1,27 @@
-pytest==8.1.1
-jupyter==1.0.0
+# Core
+pydantic>=2.0
+pydantic-settings>=2.0
+psycopg2-binary>=2.9
+requests>=2.31
+
+# Database migrations
+yoyo-migrations>=8.2
+
+# Scheduling (better than cron for containerized apps)
+APScheduler>=3.10
+
+# Observability
+structlog>=24.1
+prometheus-client>=0.19
+
+# Dev/Testing
+pytest>=8.0
+pytest-asyncio>=0.23
+respx>=0.20
+pytest-postgresql>=5.0
+
+# Jupyter
+jupyter>=1.0
+pandas>=2.0
+matplotlib>=3.8
+sqlalchemy>=2.0
