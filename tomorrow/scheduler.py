@@ -24,7 +24,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from tomorrow.config import get_settings
 from tomorrow.etl import run_hourly_pipeline, run_minutely_pipeline
-from tomorrow.observability import configure_logging, get_logger, log_metric
+from tomorrow.observability import configure_logging, get_logger
 
 logger = get_logger(__name__)
 
@@ -38,8 +38,6 @@ def create_scheduler() -> BackgroundScheduler:
     Returns:
         Configured BackgroundScheduler instance
     """
-    settings = get_settings()
-
     scheduler = BackgroundScheduler(
         {
             "apscheduler.jobstores.default": {
