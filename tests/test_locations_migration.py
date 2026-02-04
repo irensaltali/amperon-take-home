@@ -60,7 +60,7 @@ def cursor(db_conn):
 
 class TestLocationsTableStructure:
     """Tests for the locations table schema."""
-    
+
     def test_table_exists(self, cursor):
         """Locations table should exist."""
         cursor.execute("""
@@ -71,7 +71,7 @@ class TestLocationsTableStructure:
         """)
         result = cursor.fetchone()
         assert result["exists"] is True
-    
+
     def test_required_columns_exist(self, cursor):
         """Table should have all required columns."""
         cursor.execute("""
@@ -81,19 +81,22 @@ class TestLocationsTableStructure:
             ORDER BY ordinal_position;
         """)
         columns = {row["column_name"]: row for row in cursor.fetchall()}
-        
+
         assert "id" in columns
         assert "lat" in columns
         assert "lon" in columns
         assert "name" in columns
         assert "is_active" in columns
         assert "created_at" in columns
-        
+
         # Check data types
-        assert "integer" in columns["id"]["data_type"] or "serial" in columns["id"]["data_type"]
+        assert (
+            "integer" in columns["id"]["data_type"]
+            or "serial" in columns["id"]["data_type"]
+        )
         assert columns["lat"]["is_nullable"] == "NO"
         assert columns["lon"]["is_nullable"] == "NO"
-    
+
     def test_primary_key_exists(self, cursor):
         """Table should have a primary key on id."""
         cursor.execute("""
@@ -106,7 +109,7 @@ class TestLocationsTableStructure:
         """)
         result = cursor.fetchone()
         assert result["column_name"] == "id"
-    
+
     def test_unique_constraint_on_coordinates(self, cursor):
         """Should have unique constraint on (lat, lon)."""
         cursor.execute("""
@@ -118,7 +121,7 @@ class TestLocationsTableStructure:
         """)
         result = cursor.fetchone()
         assert result["count"] == 1
-    
+
     def test_check_constraints_exist(self, cursor):
         """Should have check constraints for lat/lon validation."""
         cursor.execute("""
@@ -129,7 +132,7 @@ class TestLocationsTableStructure:
         constraints = [row["constraint_name"] for row in cursor.fetchall()]
         assert "valid_lat" in constraints
         assert "valid_lon" in constraints
-    
+
     def test_active_index_exists(self, cursor):
         """Should have index on is_active for filtered queries."""
         cursor.execute("""
@@ -144,29 +147,35 @@ class TestLocationsTableStructure:
 
 class TestDefaultLocations:
     """Tests for the default 10 locations from ASSIGNMENT.md."""
-    
+
     def test_all_ten_locations_inserted(self, cursor):
         """All 10 locations should be present."""
         cursor.execute("SELECT COUNT(*) as count FROM locations;")
         result = cursor.fetchone()
         assert result["count"] == 10
-    
+
     def test_location_coordinates_match(self, cursor):
         """Coordinates should match ASSIGNMENT.md exactly."""
         cursor.execute("SELECT lat, lon FROM locations ORDER BY id;")
         actual = [(row["lat"], row["lon"]) for row in cursor.fetchall()]
-        
+
         assert len(actual) == 10
         for expected, actual_coords in zip(EXPECTED_LOCATIONS, actual):
-            assert actual_coords[0] == expected[0], f"Latitude mismatch: {actual_coords[0]} != {expected[0]}"
-            assert actual_coords[1] == expected[1], f"Longitude mismatch: {actual_coords[1]} != {expected[1]}"
-    
+            assert actual_coords[0] == expected[0], (
+                f"Latitude mismatch: {actual_coords[0]} != {expected[0]}"
+            )
+            assert actual_coords[1] == expected[1], (
+                f"Longitude mismatch: {actual_coords[1]} != {expected[1]}"
+            )
+
     def test_locations_are_active(self, cursor):
         """All default locations should be active."""
-        cursor.execute("SELECT COUNT(*) as count FROM locations WHERE is_active = TRUE;")
+        cursor.execute(
+            "SELECT COUNT(*) as count FROM locations WHERE is_active = TRUE;"
+        )
         result = cursor.fetchone()
         assert result["count"] == 10
-    
+
     def test_locations_have_names(self, cursor):
         """All locations should have descriptive names."""
         cursor.execute("SELECT name FROM locations WHERE name IS NULL;")
@@ -176,7 +185,7 @@ class TestDefaultLocations:
 
 class TestConstraints:
     """Tests for database constraints."""
-    
+
     def test_duplicate_coordinates_rejected(self, db_conn, cursor):
         """Should reject duplicate lat/lon combinations."""
         # Try to insert a duplicate
@@ -186,10 +195,10 @@ class TestConstraints:
                 VALUES (25.8600, -97.4200, 'Duplicate');
             """)
             db_conn.commit()
-        
+
         # Rollback the failed transaction
         db_conn.rollback()
-    
+
     def test_invalid_latitude_rejected(self, db_conn, cursor):
         """Should reject latitudes outside -90 to 90."""
         with pytest.raises(pg_errors.CheckViolation):
@@ -198,9 +207,9 @@ class TestConstraints:
                 VALUES (100.0, -97.4200, 'Invalid Lat');
             """)
             db_conn.commit()
-        
+
         db_conn.rollback()
-    
+
     def test_invalid_longitude_rejected(self, db_conn, cursor):
         """Should reject longitudes outside -180 to 180."""
         with pytest.raises(pg_errors.CheckViolation):
@@ -209,9 +218,9 @@ class TestConstraints:
                 VALUES (25.8600, 200.0, 'Invalid Lon');
             """)
             db_conn.commit()
-        
+
         db_conn.rollback()
-    
+
     def test_null_latitude_rejected(self, db_conn, cursor):
         """Should reject NULL latitude."""
         with pytest.raises(pg_errors.NotNullViolation):
@@ -220,13 +229,13 @@ class TestConstraints:
                 VALUES (NULL, -97.4200, 'Null Lat');
             """)
             db_conn.commit()
-        
+
         db_conn.rollback()
 
 
 class TestDataTypes:
     """Tests for column data types and precision."""
-    
+
     def test_lat_precision(self, cursor):
         """Latitude should support 4 decimal places."""
         cursor.execute("""
@@ -236,7 +245,7 @@ class TestDataTypes:
         result = cursor.fetchone()
         assert result is not None
         assert str(result["lat"]) == "25.8600"
-    
+
     def test_lon_precision(self, cursor):
         """Longitude should support 4 decimal places."""
         cursor.execute("""
@@ -250,7 +259,7 @@ class TestDataTypes:
 
 class TestQueryPatterns:
     """Tests for expected query patterns."""
-    
+
     def test_get_active_locations(self, cursor):
         """Should be able to query active locations efficiently."""
         cursor.execute("""
@@ -261,12 +270,12 @@ class TestQueryPatterns:
         """)
         results = cursor.fetchall()
         assert len(results) == 10
-        
+
         # Verify structure
         assert all("id" in row for row in results)
         assert all("lat" in row for row in results)
         assert all("lon" in row for row in results)
-    
+
     def test_get_location_by_coordinates(self, cursor):
         """Should be able to look up location by coordinates."""
         cursor.execute("""
