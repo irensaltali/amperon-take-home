@@ -4,7 +4,6 @@ Provides connection pooling, transaction management, and CRUD operations
 for locations and weather data.
 """
 
-import logging
 from contextlib import contextmanager
 from datetime import datetime
 from typing import List, Optional, Tuple
@@ -16,8 +15,9 @@ from psycopg2.pool import SimpleConnectionPool
 
 from tomorrow.config import get_settings
 from tomorrow.models import Location, LocationSummary, WeatherReading
+from tomorrow.observability import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Global connection pool (initialized on first use)
 _connection_pool: Optional[SimpleConnectionPool] = None
@@ -50,12 +50,18 @@ def get_connection_pool() -> SimpleConnectionPool:
                 cursor_factory=RealDictCursor,
             )
             logger.info(
-                f"database_pool_created host={settings.pg_host} port={settings.pg_port} "
-                f"database={settings.pg_database} pool_size={settings.pg_pool_size}"
+                "database_pool_created",
+                host=settings.pg_host,
+                port=settings.pg_port,
+                database=settings.pg_database,
+                pool_size=settings.pg_pool_size,
             )
         except psycopg2.Error as e:
             logger.error(
-                f"database_pool_creation_failed host={settings.pg_host} port={settings.pg_port}: {e}"
+                "database_pool_creation_failed",
+                host=settings.pg_host,
+                port=settings.pg_port,
+                error=str(e),
             )
             raise
 
@@ -85,7 +91,7 @@ def get_connection():
     except psycopg2.Error as e:
         if conn:
             conn.rollback()
-        logger.error(f"database_error: {e}")
+        logger.error("database_error", error=str(e))
         raise
     finally:
         if conn:
@@ -153,7 +159,7 @@ def get_active_locations() -> List[Location]:
 
         locations = [Location.model_validate(dict(row)) for row in rows]
 
-        logger.info(f"locations_fetched count={len(locations)}")
+        logger.info("locations_fetched", count=len(locations))
 
         return locations
 
@@ -294,7 +300,9 @@ def insert_readings(readings: List[WeatherReading]) -> int:
         rowcount = cur.rowcount
 
         logger.info(
-            f"readings_inserted count={rowcount} location_id={readings[0].location_id if readings else None}"
+            "readings_inserted",
+            count=rowcount,
+            location_id=readings[0].location_id if readings else None,
         )
 
         return rowcount
@@ -337,7 +345,9 @@ def get_latest_by_location(granularity: str = "hourly") -> List[LocationSummary]
         summaries = [LocationSummary.model_validate(dict(row)) for row in rows]
 
         logger.info(
-            f"latest_readings_fetched count={len(summaries)} granularity={granularity}"
+            "latest_readings_fetched",
+            count=len(summaries),
+            granularity=granularity,
         )
 
         return summaries
@@ -397,8 +407,12 @@ def get_time_series(
         readings = [WeatherReading.model_validate(dict(row)) for row in rows]
 
         logger.info(
-            f"time_series_fetched location_id={location_id} granularity={granularity} "
-            f"start={start_time.isoformat()} end={end_time.isoformat()} count={len(readings)}"
+            "time_series_fetched",
+            location_id=location_id,
+            granularity=granularity,
+            start=start_time.isoformat(),
+            end=end_time.isoformat(),
+            count=len(readings),
         )
 
         return readings
@@ -451,5 +465,5 @@ def health_check() -> bool:
             cur.execute("SELECT 1")
             return True
     except psycopg2.Error as e:
-        logger.error(f"health_check_failed: {e}")
+        logger.error("health_check_failed", error=str(e))
         return False

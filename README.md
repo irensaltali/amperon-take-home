@@ -68,8 +68,8 @@ docker compose up -d
 # Check logs
 docker compose logs -f tomorrow
 
-# View structured logs with jq
-docker compose logs tomorrow | jq 'select(.event == "pipeline_completed")'
+# View structured logs with jq (--no-log-prefix removes container prefix, grep '^{' filters JSON lines)
+docker compose logs --no-log-prefix tomorrow | grep '^{' | jq 'select(.event == "etl_pipeline_completed")'
 
 # Open Jupyter Notebook for analysis
 open http://localhost:8888
@@ -253,14 +253,17 @@ All logs are output as JSON to stdout for Docker capture:
 # View all logs
 docker compose logs tomorrow
 
-# Filter specific events
-docker compose logs tomorrow | jq 'select(.event == "pipeline_completed")'
+# Filter specific events (--no-log-prefix removes container prefix, grep '^{' filters JSON lines)
+docker compose logs --no-log-prefix tomorrow | grep '^{' | jq 'select(.event == "etl_pipeline_completed")'
 
-# Calculate average pipeline duration
-docker compose logs tomorrow | jq -s '[.[] | select(.event == "pipeline_completed") | .duration_seconds] | add / length'
+# Calculate average pipeline duration (returns null if no events found)
+docker compose logs --no-log-prefix tomorrow | grep '^{' | jq -s '[.[] | select(.event == "etl_pipeline_completed") | .duration_seconds] | if length > 0 then add / length else "No pipeline runs found" end'
 
 # Find errors
-docker compose logs tomorrow | jq 'select(.level == "error")'
+docker compose logs --no-log-prefix tomorrow | grep '^{' | jq 'select(.level == "error")'
+
+# View database operations
+docker compose logs --no-log-prefix tomorrow | grep '^{' | jq 'select(.logger_name == "tomorrow.db")'
 ```
 
 ### Log Format

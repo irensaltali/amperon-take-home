@@ -1,6 +1,5 @@
 """Tomorrow.io API client."""
 
-import logging
 from typing import Optional
 
 import requests
@@ -9,8 +8,9 @@ from urllib3.util.retry import Retry
 
 from tomorrow.config import get_settings
 from tomorrow.models import Location, TimelinesResponse
+from tomorrow.observability import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 DEFAULT_BASE_URL = "https://api.tomorrow.io/v4"
 DEFAULT_TIMEOUT = 30
@@ -88,10 +88,10 @@ class TomorrowClient:
             return TimelinesResponse.model_validate(data)
 
         except requests.RequestException as e:
-            logger.error(f"API Request failed: {e}")
+            logger.error("api_request_failed", error=str(e))
             raise TomorrowAPIError(f"Request failed: {e}") from e
         except ValueError as e:
-            logger.error(f"Failed to parse response: {e}")
+            logger.error("response_parse_failed", error=str(e))
             raise TomorrowAPIError(f"Invalid response data: {e}") from e
 
     def close(self):
