@@ -54,11 +54,9 @@ TOMORROW_API_KEY=your_api_key_here
 ### 2. Start Services
 
 ```bash
-# Start database and scheduler
+# Start all services (database, ETL pipeline, Jupyter notebook)
+# Migrations run automatically on first start
 docker compose up -d
-
-# Run migrations (first time only)
-docker compose --profile migrate run --rm tomorrow-migrate
 ```
 
 ### 3. Verify Installation
@@ -69,16 +67,29 @@ docker compose logs -f tomorrow
 
 # View structured logs with jq
 docker compose logs tomorrow | jq 'select(.event == "pipeline_completed")'
+
+# Open Jupyter Notebook for analysis
+open http://localhost:8888
 ```
 
-### 4. Analyze Data (Optional)
+### Services Overview
 
-```bash
-# Start Jupyter notebook
-docker compose --profile jupyter up -d
+After `docker compose up -d`, the following services are available:
 
-# Open http://localhost:8888
-```
+| Service | URL | Description |
+|---------|-----|-------------|
+| PostgreSQL | `localhost:5432` | Database with weather data |
+| ETL Pipeline | logs only | Background data ingestion |
+| Jupyter | http://localhost:8888 | Data analysis notebook |
+
+### Notebook Analysis
+
+The `analysis.ipynb` notebook includes:
+- **Query 1**: Latest temperature and wind speed by location
+- **Query 2**: Hourly time series analysis (-1 day to +5 days)
+- **Comparative Analysis**: Temperature variations across all 10 locations
+- **Data Quality**: Record counts and availability metrics
+- **Statistics**: Average, min, max values with heatmap visualization
 
 ## Usage
 
@@ -101,17 +112,14 @@ python -m tomorrow migrate
 ### Docker Commands
 
 ```bash
-# Start all services
+# Start all services (migrations run automatically)
 docker compose up -d
 
-# View logs
+# View ETL logs
 docker compose logs -f tomorrow
 
-# Run migrations
-docker compose --profile migrate run --rm tomorrow-migrate
-
-# Start Jupyter for analysis
-docker compose --profile jupyter up -d
+# View Jupyter logs
+docker compose logs -f jupyter
 
 # Stop all services
 docker compose down

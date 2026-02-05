@@ -21,15 +21,19 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: python -m tomorrow scheduler
+    # Run migrations first, then start scheduler
+    command: >
+      sh -c "python -m tomorrow migrate && python -m tomorrow scheduler"
     environment:
+      # From .env (user-configurable)
       TOMORROW_API_KEY: ${TOMORROW_API_KEY}
-      PGHOST: ${PGHOST:-postgres}
-      PGPORT: ${PGPORT:-5432}
-      PGUSER: ${PGUSER:-postgres}
-      PGPASSWORD: ${PGPASSWORD:-postgres}
-      PGDATABASE: ${PGDATABASE:-tomorrow}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Internal Docker networking (hardcoded for container-to-container communication)
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: tomorrow
     depends_on:
       postgres:
         condition: service_healthy
@@ -46,24 +50,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  tomorrow-migrate:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: python -m tomorrow migrate
-    environment:
-      PGHOST: ${PGHOST:-postgres}
-      PGPORT: ${PGPORT:-5432}
-      PGUSER: ${PGUSER:-postgres}
-      PGPASSWORD: ${PGPASSWORD:-postgres}
-      PGDATABASE: ${PGDATABASE:-tomorrow}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    profiles:
-      - migrate
-    restart: "no"
-
   jupyter:
     build:
       context: .
@@ -72,18 +58,17 @@ services:
     ports:
       - "8888:8888"
     environment:
-      PGHOST: ${PGHOST:-postgres}
-      PGPORT: ${PGPORT:-5432}
-      PGUSER: ${PGUSER:-postgres}
-      PGPASSWORD: ${PGPASSWORD:-postgres}
-      PGDATABASE: ${PGDATABASE:-tomorrow}
+      # Internal Docker networking (hardcoded for container-to-container communication)
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: tomorrow
     volumes:
       - "${PWD}/analysis.ipynb:/app/analysis.ipynb"
     depends_on:
       postgres:
         condition: service_healthy
-    profiles:
-      - jupyter
     restart: unless-stopped
 
 volumes:
