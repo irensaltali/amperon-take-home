@@ -8,6 +8,7 @@ Provides a robust HTTP client for the Tomorrow.io Weather API with:
 """
 
 import logging
+import time
 from typing import Optional
 from urllib.parse import urljoin
 
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_BASE_URL = "https://api.tomorrow.io/v4/"
 DEFAULT_TIMEOUT = 30  # seconds
 
-# Fields to request from the API (all available fields for completeness)
+# Fields to request from the API (reduced to essentials for rate limit efficiency)
 DEFAULT_FIELDS = [
     "temperature",
     "temperatureApparent",
@@ -32,32 +33,14 @@ DEFAULT_FIELDS = [
     "windGust",
     "windDirection",
     "humidity",
-    "dewPoint",
-    "cloudCover",
-    "cloudBase",
-    "cloudCeiling",
-    "visibility",
     "precipitationProbability",
-    "rainIntensity",
-    "rainAccumulation",
-    "freezingRainIntensity",
-    "sleetIntensity",
-    "sleetAccumulation",
-    "sleetAccumulationLwe",
-    "snowIntensity",
-    "snowAccumulation",
-    "snowAccumulationLwe",
-    "snowDepth",
-    "iceAccumulation",
-    "iceAccumulationLwe",
-    "evapotranspiration",
+    "weatherCode",
     "pressureSeaLevel",
     "pressureSurfaceLevel",
-    "altimeterSetting",
-    "weatherCode",
-    "uvIndex",
-    "uvHealthConcern",
 ]
+
+# Delay between API requests to avoid rate limiting (seconds)
+REQUEST_DELAY = 3.0
 
 
 class TomorrowAPIError(Exception):
@@ -129,10 +112,12 @@ class TomorrowClient:
 
         # Create session with retry strategy
         self.session = requests.Session()
+        # Note: 429 (rate limit) is NOT in the retry list - we handle it explicitly
+        # to avoid burning through API quota with automatic retries
         retry_strategy = Retry(
             total=max_retries,
             backoff_factor=1,  # 1s, 2s, 4s between retries
-            status_forcelist=[429, 500, 502, 503, 504],  # Retry these status codes
+            status_forcelist=[500, 502, 503, 504],  # Only retry server errors
             allowed_methods=["GET"],  # Only retry GET requests
         )
         adapter = HTTPAdapter(max_retries=retry_strategy)
@@ -237,12 +222,13 @@ class TomorrowClient:
 
             # Log success with data summary
             total_entries = sum(
-                len(entries) for entries in timelines_response.timelines.values()
+                len(timeline.intervals) for timeline in timelines_response.data.timelines
             )
+            timesteps_found = [t.timestep for t in timelines_response.data.timelines]
             logger.info(
                 f"weather_fetch_success location_id={location.id} "
                 f"entries={total_entries} "
-                f"granularities={list(timelines_response.timelines.keys())}"
+                f"timesteps={timesteps_found}"
             )
 
             return timelines_response
@@ -275,17 +261,28 @@ class TomorrowClient:
 
         logger.info(f"batch_fetch_weather location_count={len(locations)}")
 
-        for location in locations:
+        for i, location in enumerate(locations):
+            # Add delay between requests to avoid rate limiting
+            if i > 0:
+                logger.debug(f"rate_limit_delay seconds={REQUEST_DELAY}")
+                time.sleep(REQUEST_DELAY)
+
             try:
                 response = self.fetch_weather(
                     location, fields=fields, timesteps=timesteps
                 )
                 results[location.id] = response
+            except TomorrowAPIRateLimitError as e:
+                logger.warning(
+                    f"rate_limit_hit location_id={location.id} - stopping batch to preserve quota"
+                )
+                # Stop processing to avoid wasting more quota
+                break
             except TomorrowAPIError as e:
                 logger.error(
                     f"fetch_weather_failed location_id={location.id} error={e}"
                 )
-                # Continue with other locations
+                # Continue with other locations for non-rate-limit errors
                 continue
 
         logger.info(

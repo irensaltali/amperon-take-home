@@ -21,7 +21,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    # Run migrations first, then start scheduler
+    # 1. Run migrations, 2. Start scheduler (fetches data hourly)
+    # NOTE: We don't do an initial fetch to avoid rate limit issues on restarts
     command: >
       sh -c "python -m tomorrow migrate && python -m tomorrow scheduler"
     environment:
