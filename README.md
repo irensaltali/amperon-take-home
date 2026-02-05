@@ -51,6 +51,7 @@ A production-grade weather data ingestion system that fetches data from Tomorrow
 - **API Validation**: Pydantic models validated against real API responses
 - **Structured Logging**: JSON logs to stdout (Docker-captured), analyzed with `jq`
 - **Migrations**: Every DB change uses yoyo-migrations
+- **Smart Initialization**: Automatic backfill on startup if data is missing or stale
 - **Observability**: Comprehensive logging via structlog
 - **CI/CD**: GitHub Actions with automated testing
 
@@ -80,7 +81,7 @@ TOMORROW_API_KEY=your_api_key_here
 # Start all services (database, ETL pipeline, Jupyter notebook)
 # On first start:
 #   1. Database migrations run automatically
-#   2. Initial data fetch from Tomorrow.io API
+#   2. Smart initial fetch (runs only if data is missing or stale)
 #   3. Scheduler starts for hourly updates
 docker compose up -d
 ```
@@ -142,7 +143,7 @@ python -m tomorrow migrate
 ```bash
 # Start all services
 # - Migrations run automatically
-# - Initial data fetch from API (fills database immediately)
+# - Smart initial fetch (runs only if data is missing or stale)
 # - Scheduler starts for hourly updates
 docker compose up -d
 
