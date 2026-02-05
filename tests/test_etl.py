@@ -28,6 +28,9 @@ from tomorrow.models import (
     Location,
     WeatherReading,
     TimelinesResponse,
+    TimelinesData,
+    Timeline,
+    TimelineInterval,
     TimelineEntry,
     TimelineValues,
 )
@@ -54,48 +57,55 @@ def sample_location():
 def mock_timelines_response():
     """Create a mock API response."""
     return TimelinesResponse(
-        timelines={
-            "hourly": [
-                TimelineEntry(
-                    time=datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-                    values=TimelineValues(
-                        temperature=22.5,
-                        temperature_apparent=21.0,
-                        wind_speed=5.2,
-                        wind_gust=8.1,
-                        wind_direction=180,
-                        humidity=65.0,
-                        dew_point=15.5,
-                        cloud_cover=20.0,
-                        visibility=10.0,
-                        precipitation_probability=10.0,
-                        pressure_sea_level=1013.0,
-                        pressure_surface_level=1012.0,
-                        weather_code=1000,
-                        uv_index=5,
-                    ),
-                ),
-                TimelineEntry(
-                    time=datetime(2024, 1, 1, 13, 0, 0, tzinfo=timezone.utc),
-                    values=TimelineValues(
-                        temperature=23.0,
-                        temperature_apparent=22.0,
-                        wind_speed=5.5,
-                        wind_gust=8.5,
-                        wind_direction=185,
-                        humidity=63.0,
-                        dew_point=15.8,
-                        cloud_cover=25.0,
-                        visibility=10.0,
-                        precipitation_probability=15.0,
-                        pressure_sea_level=1012.0,
-                        pressure_surface_level=1011.0,
-                        weather_code=1000,
-                        uv_index=6,
-                    ),
-                ),
+        data=TimelinesData(
+            timelines=[
+                Timeline(
+                    timestep="1h",
+                    startTime=datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+                    endTime=datetime(2024, 1, 1, 14, 0, 0, tzinfo=timezone.utc),
+                    intervals=[
+                        TimelineInterval(
+                            startTime=datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+                            values=TimelineValues(
+                                temperature=22.5,
+                                temperature_apparent=21.0,
+                                wind_speed=5.2,
+                                wind_gust=8.1,
+                                wind_direction=180,
+                                humidity=65.0,
+                                dew_point=15.5,
+                                cloud_cover=20.0,
+                                visibility=10.0,
+                                precipitation_probability=10.0,
+                                pressure_sea_level=1013.0,
+                                pressure_surface_level=1012.0,
+                                weather_code=1000,
+                                uv_index=5,
+                            ),
+                        ),
+                        TimelineInterval(
+                            startTime=datetime(2024, 1, 1, 13, 0, 0, tzinfo=timezone.utc),
+                            values=TimelineValues(
+                                temperature=23.0,
+                                temperature_apparent=22.0,
+                                wind_speed=5.5,
+                                wind_gust=8.5,
+                                wind_direction=185,
+                                humidity=63.0,
+                                dew_point=15.8,
+                                cloud_cover=25.0,
+                                visibility=10.0,
+                                precipitation_probability=15.0,
+                                pressure_sea_level=1012.0,
+                                pressure_surface_level=1011.0,
+                                weather_code=1000,
+                                uv_index=6,
+                            ),
+                        ),
+                    ]
+                )
             ]
-        }
+        )
     )
 
 
@@ -155,7 +165,7 @@ class TestTransformTimelineToReadings:
 
     def test_transform_empty_timeline(self, sample_location):
         """Should handle empty timeline gracefully."""
-        empty_response = TimelinesResponse(timelines={"hourly": []})
+        empty_response = TimelinesResponse(data=TimelinesData(timelines=[]))
 
         readings = transform_timeline_to_readings(
             location=sample_location,
@@ -166,7 +176,19 @@ class TestTransformTimelineToReadings:
 
     def test_transform_missing_granularity(self, sample_location):
         """Should handle missing granularity in response."""
-        response = TimelinesResponse(timelines={"daily": []})
+        # Timelines with different timestep
+        response = TimelinesResponse(
+             data=TimelinesData(
+                 timelines=[
+                     Timeline(
+                         timestep="1d",
+                         startTime=datetime.now(timezone.utc),
+                         endTime=datetime.now(timezone.utc),
+                         intervals=[]
+                     )
+                 ]
+             )
+        )
 
         readings = transform_timeline_to_readings(
             location=sample_location,
