@@ -10,3 +10,4 @@ COPY ./requirements.txt .
 RUN python -m pip install -r requirements.txt
 
 COPY ./tomorrow /app/tomorrow
+COPY ./migrations /app/migrations
