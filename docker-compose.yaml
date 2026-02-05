@@ -24,11 +24,11 @@ services:
     command: python -m tomorrow scheduler
     environment:
       TOMORROW_API_KEY: ${TOMORROW_API_KEY}
-      PGHOST: postgres
-      PGPORT: 5432
-      PGUSER: postgres
-      PGPASSWORD: postgres
-      PGDATABASE: tomorrow
+      PGHOST: ${PGHOST:-postgres}
+      PGPORT: ${PGPORT:-5432}
+      PGUSER: ${PGUSER:-postgres}
+      PGPASSWORD: ${PGPASSWORD:-postgres}
+      PGDATABASE: ${PGDATABASE:-tomorrow}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:
       postgres:
@@ -52,11 +52,11 @@ services:
       dockerfile: Dockerfile
     command: python -m tomorrow migrate
     environment:
-      PGHOST: postgres
-      PGPORT: 5432
-      PGUSER: postgres
-      PGPASSWORD: postgres
-      PGDATABASE: tomorrow
+      PGHOST: ${PGHOST:-postgres}
+      PGPORT: ${PGPORT:-5432}
+      PGUSER: ${PGUSER:-postgres}
+      PGPASSWORD: ${PGPASSWORD:-postgres}
+      PGDATABASE: ${PGDATABASE:-tomorrow}
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,11 +72,11 @@ services:
     ports:
       - "8888:8888"
     environment:
-      PGHOST: postgres
-      PGPORT: 5432
-      PGUSER: postgres
-      PGPASSWORD: postgres
-      PGDATABASE: tomorrow
+      PGHOST: ${PGHOST:-postgres}
+      PGPORT: ${PGPORT:-5432}
+      PGUSER: ${PGUSER:-postgres}
+      PGPASSWORD: ${PGPASSWORD:-postgres}
+      PGDATABASE: ${PGDATABASE:-tomorrow}
     volumes:
       - "${PWD}/analysis.ipynb:/app/analysis.ipynb"
     depends_on:
