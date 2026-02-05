@@ -21,7 +21,7 @@ respx>=0.20
 pytest-postgresql>=5.0
 
 # Jupyter
-jupyter>=1.0
+jupyter>=1.1.1
 pandas>=2.0
 matplotlib>=3.8
 seaborn>=0.13

@@ -26,7 +26,7 @@ import sys
 
 from tomorrow.config import get_settings
 from tomorrow.db import health_check
-from tomorrow.etl import run_hourly_pipeline
+from tomorrow.etl import run_hourly_pipeline, check_and_run_initial_fetch
 from tomorrow.migrations import run_migrations
 from tomorrow.observability import configure_logging, get_logger
 from tomorrow.scheduler import setup_signal_handlers, start_scheduler
@@ -88,6 +88,13 @@ def cmd_scheduler(args: argparse.Namespace) -> int:
 
     # Setup signal handlers for graceful shutdown
     setup_signal_handlers()
+
+    # Check for initial data and run pipeline if needed
+    try:
+        check_and_run_initial_fetch()
+    except Exception as e:
+        # Don't crash scheduler if initial check fails, just log it
+        logger.error("initial_data_check_failed", error=str(e))
 
     # Start scheduler (blocks indefinitely)
     try:
