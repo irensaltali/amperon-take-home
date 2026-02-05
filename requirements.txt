@@ -24,4 +24,6 @@ pytest-postgresql>=5.0
 jupyter>=1.0
 pandas>=2.0
 matplotlib>=3.8
+seaborn>=0.13
 sqlalchemy>=2.0
+python-dotenv>=1.0
