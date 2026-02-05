@@ -70,9 +70,9 @@ The Tomorrow.io Weather Data Pipeline is a containerized ETL system that:
 - Assignment queries
 
 ### `tomorrow/client.py`
-- HTTP client for Tomorrow.io API
-- Automatic retry with exponential backoff
-- Error handling (auth, rate limit, server errors)
+- Simple HTTP client for Tomorrow.io API
+- Automatic retry for 5xx errors
+- Rate limit handling (429)
 
 ### `tomorrow/etl.py`
 - ETL pipeline orchestration
@@ -107,38 +107,31 @@ The Tomorrow.io Weather Data Pipeline is a containerized ETL system that:
 │ name            │       │ temperature         │
 │ is_active       │       │ wind_speed          │
 │ created_at      │       │ humidity            │
-└─────────────────┘       │ pressure_*          │
-                          │ ... (all API fields)│
-                          │ fetched_at          │
+└─────────────────┘       │ ... (all API fields)│
                           └─────────────────────┘
 ```
 
 ### Key Design Decisions
 
 1. **Composite Primary Key**: `(location_id, timestamp, data_granularity)`
-   - Allows same timestamp for different granularities
-   - Prevents duplicate inserts
+   - Prevents duplicate inserts for the same time/granularity
 
 2. **UPSERT (ON CONFLICT)**: Idempotent inserts
-   - Safe to re-run pipeline
-   - Updates existing records
+   - Safe to re-run pipeline; updates existing records
 
 3. **Indexes**:
-   - `idx_weather_time_lookup`: Time range queries
-   - `idx_weather_latest`: Latest value queries
-   - `idx_weather_fetched_at`: Data freshness
+   - Optimized for time-series and latest-value queries
 
 ## Error Handling Strategy
 
 | Component | Error Type | Handling |
 |-----------|-----------|----------|
-| API Client | 401 Auth | Raise TomorrowAPIAuthError |
-| API Client | 429 Rate Limit | Raise TomorrowAPIRateLimitError |
-| API Client | 5xx Server | Retry with backoff |
-| API Client | Timeout | Retry with backoff |
-| ETL | API Error | Log, continue with other locations |
-| ETL | DB Error | Log, fail pipeline |
-| Scheduler | Job Error | Log, continue scheduling |
+| API Client | 429 Rate Limit | Raises TomorrowAPIRateLimitError |
+| API Client | 5xx Server | Automatic Retry |
+| API Client | Network/Timeout | Raises TomorrowAPIError |
+| API Client | Other API Error | Raises TomorrowAPIError |
+| ETL | API Error | Logs & Skips Location |
+| ETL | DB Error | Logs & Fails Pipeline |
 
 ## Scalability Considerations
 

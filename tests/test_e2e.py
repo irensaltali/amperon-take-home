@@ -74,46 +74,53 @@ class TestETLPipelineIntegration:
     def mock_api_response(self):
         """Create a mock API response for testing."""
         return {
-            "timelines": {
-                "hourly": [
+            "data": {
+                "timelines": [
                     {
-                        "time": "2024-01-15T12:00:00Z",
-                        "values": {
-                            "temperature": 22.5,
-                            "temperatureApparent": 21.0,
-                            "windSpeed": 5.2,
-                            "windGust": 8.1,
-                            "windDirection": 180,
-                            "humidity": 65.0,
-                            "dewPoint": 15.5,
-                            "cloudCover": 20.0,
-                            "visibility": 10.0,
-                            "precipitationProbability": 10.0,
-                            "pressureSeaLevel": 1013.0,
-                            "pressureSurfaceLevel": 1012.0,
-                            "weatherCode": 1000,
-                            "uvIndex": 5,
-                        },
-                    },
-                    {
-                        "time": "2024-01-15T13:00:00Z",
-                        "values": {
-                            "temperature": 23.0,
-                            "temperatureApparent": 22.0,
-                            "windSpeed": 5.5,
-                            "windGust": 8.5,
-                            "windDirection": 185,
-                            "humidity": 63.0,
-                            "dewPoint": 15.8,
-                            "cloudCover": 25.0,
-                            "visibility": 10.0,
-                            "precipitationProbability": 15.0,
-                            "pressureSeaLevel": 1012.0,
-                            "pressureSurfaceLevel": 1011.0,
-                            "weatherCode": 1000,
-                            "uvIndex": 6,
-                        },
-                    },
+                        "timestep": "1h",
+                        "startTime": "2024-01-15T12:00:00Z",
+                        "endTime": "2024-01-15T14:00:00Z",
+                        "intervals": [
+                            {
+                                "startTime": "2024-01-15T12:00:00Z",
+                                "values": {
+                                    "temperature": 22.5,
+                                    "temperatureApparent": 21.0,
+                                    "windSpeed": 5.2,
+                                    "windGust": 8.1,
+                                    "windDirection": 180,
+                                    "humidity": 65.0,
+                                    "dewPoint": 15.5,
+                                    "cloudCover": 20.0,
+                                    "visibility": 10.0,
+                                    "precipitationProbability": 10.0,
+                                    "pressureSeaLevel": 1013.0,
+                                    "pressureSurfaceLevel": 1012.0,
+                                    "weatherCode": 1000,
+                                    "uvIndex": 5,
+                                },
+                            },
+                            {
+                                "startTime": "2024-01-15T13:00:00Z",
+                                "values": {
+                                    "temperature": 23.0,
+                                    "temperatureApparent": 22.0,
+                                    "windSpeed": 5.5,
+                                    "windGust": 8.5,
+                                    "windDirection": 185,
+                                    "humidity": 63.0,
+                                    "dewPoint": 15.8,
+                                    "cloudCover": 25.0,
+                                    "visibility": 10.0,
+                                    "precipitationProbability": 15.0,
+                                    "pressureSeaLevel": 1012.0,
+                                    "pressureSurfaceLevel": 1011.0,
+                                    "weatherCode": 1000,
+                                    "uvIndex": 6,
+                                },
+                            },
+                        ]
+                    }
                 ]
             }
         }
@@ -132,51 +139,64 @@ class TestETLPipelineIntegration:
         mock_client = MagicMock(spec=TomorrowClient)
 
         # Create proper mock response that matches TimelinesResponse structure
-        from tomorrow.models import TimelinesResponse, TimelineEntry, TimelineValues
+        from tomorrow.models import (
+            TimelinesResponse, 
+            TimelinesData, 
+            Timeline, 
+            TimelineInterval, 
+            TimelineValues
+        )
 
         mock_response = TimelinesResponse(
-            timelines={
-                "hourly": [
-                    TimelineEntry(
-                        time=datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc),
-                        values=TimelineValues(
-                            temperature=22.5,
-                            temperature_apparent=21.0,
-                            wind_speed=5.2,
-                            wind_gust=8.1,
-                            wind_direction=180,
-                            humidity=65.0,
-                            dew_point=15.5,
-                            cloud_cover=20.0,
-                            visibility=10.0,
-                            precipitation_probability=10.0,
-                            pressure_sea_level=1013.0,
-                            pressure_surface_level=1012.0,
-                            weather_code=1000,
-                            uv_index=5,
-                        ),
-                    ),
-                    TimelineEntry(
-                        time=datetime(2024, 1, 15, 13, 0, 0, tzinfo=timezone.utc),
-                        values=TimelineValues(
-                            temperature=23.0,
-                            temperature_apparent=22.0,
-                            wind_speed=5.5,
-                            wind_gust=8.5,
-                            wind_direction=185,
-                            humidity=63.0,
-                            dew_point=15.8,
-                            cloud_cover=25.0,
-                            visibility=10.0,
-                            precipitation_probability=15.0,
-                            pressure_sea_level=1012.0,
-                            pressure_surface_level=1011.0,
-                            weather_code=1000,
-                            uv_index=6,
-                        ),
-                    ),
+            data=TimelinesData(
+                timelines=[
+                    Timeline(
+                        timestep="1h",
+                        startTime=datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc),
+                        endTime=datetime(2024, 1, 15, 14, 0, 0, tzinfo=timezone.utc),
+                        intervals=[
+                            TimelineInterval(
+                                startTime=datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc),
+                                values=TimelineValues(
+                                    temperature=22.5,
+                                    temperature_apparent=21.0,
+                                    wind_speed=5.2,
+                                    wind_gust=8.1,
+                                    wind_direction=180,
+                                    humidity=65.0,
+                                    dew_point=15.5,
+                                    cloud_cover=20.0,
+                                    visibility=10.0,
+                                    precipitation_probability=10.0,
+                                    pressure_sea_level=1013.0,
+                                    pressure_surface_level=1012.0,
+                                    weather_code=1000,
+                                    uv_index=5,
+                                ),
+                            ),
+                            TimelineInterval(
+                                startTime=datetime(2024, 1, 15, 13, 0, 0, tzinfo=timezone.utc),
+                                values=TimelineValues(
+                                    temperature=23.0,
+                                    temperature_apparent=22.0,
+                                    wind_speed=5.5,
+                                    wind_gust=8.5,
+                                    wind_direction=185,
+                                    humidity=63.0,
+                                    dew_point=15.8,
+                                    cloud_cover=25.0,
+                                    visibility=10.0,
+                                    precipitation_probability=15.0,
+                                    pressure_sea_level=1012.0,
+                                    pressure_surface_level=1011.0,
+                                    weather_code=1000,
+                                    uv_index=6,
+                                ),
+                            ),
+                        ]
+                    )
                 ]
-            }
+            )
         )
         mock_client.fetch_weather.return_value = mock_response
 

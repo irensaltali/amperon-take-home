@@ -271,7 +271,7 @@ def run_etl_pipeline(
                     f"count={len(readings)}"
                 )
 
-            except TomorrowAPIRateLimitError as e:
+            except TomorrowAPIRateLimitError:
                 locations_failed += 1
                 error_msg = f"Rate limit hit at location {location.id} - stopping to preserve quota"
                 errors.append(error_msg)
