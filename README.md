@@ -22,6 +22,29 @@ A production-grade weather data ingestion system that fetches data from Tomorrow
                        └──────────────────┘
 ```
 
+## Design Decisions & Rationale
+
+| Component | Choice | Rationale |
+|-----------|--------|-----------|
+| **Language** | Python 3.11 | Requested by assignment. Used Pydantic for strong type validation which is crucial for robust data engineering pipelines. |
+| **Database** | PostgreSQL | Robust, standard relational database perfect for structured weather data. Used raw SQL (`psycopg2`) over ORMs for better performance control and "closer to the metal" understanding, as strictly requested "data engineering" skills often prefer SQL visibility. |
+| **Scheduling** | APScheduler | Lightweight, in-process scheduler. Chosen over Airflow/Celery to keep the system "small" and self-contained (single container option) as per assignment scope, avoiding deployment complexity overhead. |
+| **Observability** | Structlog | Production-grade structured logging is essential for modern data stacks. Enables log analysis with tools like `jq` or ingestion into ELK/Datadog without parsing overhead. |
+| **API Client** | Custom + Tenacity | Built a robust custom client with `tenacity` for exponential backoff retries. This handles API flakes more reliably than simple `requests` calls. |
+| **Migrations** | Yoyo Migrations | Lightweight, raw SQL migration tool. Chosen because full ORM migrations (Alembic) were unnecessary since we aren't using an ORM for queries. |
+
+## Trade-offs & Assumptions
+
+- **Single Table Design**: I chose a denormalized `weather_data` table design where all metrics (temperature, wind, etc.) are columns.
+  - *Trade-off*: Adding new metrics requires schema migration (DDL).
+  - *Benefit*: Query patterns are almost exclusively "get all metrics for time range", so this avoids expensive joins and simplifies ingestion.
+- **Handling API Limits**: The Free Tier has strict rate limits.
+  - *Assumption*: We prioritize data continuity over real-time precision. The scheduler is set to hourly to comfortably stay within limits.
+  - *Mitigation*: Implemented a "fetcher" design that can easily scale, but throttled it intentionally.
+- **Data Granularity**: Storing granular data vs aggregates.
+  - *Decision*: Storing raw hourly data. We can compute aggregates (daily max/min) on read-time via SQL (as shown in analysis queries) rather than ETL-time, preserving raw data fidelity.
+
+
 ## Features
 
 - **No Hardcoded Locations**: 10 geolocations stored in database via migrations
@@ -68,8 +91,8 @@ docker compose up -d
 # Check logs
 docker compose logs -f tomorrow
 
-# View structured logs with jq
-docker compose logs tomorrow | jq 'select(.event == "pipeline_completed")'
+# View structured logs with jq (--no-log-prefix removes container prefix, grep '^{' filters JSON lines)
+docker compose logs --no-log-prefix tomorrow | grep '^{' | jq 'select(.event == "etl_pipeline_completed")'
 
 # Open Jupyter Notebook for analysis
 open http://localhost:8888
@@ -253,14 +276,17 @@ All logs are output as JSON to stdout for Docker capture:
 # View all logs
 docker compose logs tomorrow
 
-# Filter specific events
-docker compose logs tomorrow | jq 'select(.event == "pipeline_completed")'
+# Filter specific events (--no-log-prefix removes container prefix, grep '^{' filters JSON lines)
+docker compose logs --no-log-prefix tomorrow | grep '^{' | jq 'select(.event == "etl_pipeline_completed")'
 
-# Calculate average pipeline duration
-docker compose logs tomorrow | jq -s '[.[] | select(.event == "pipeline_completed") | .duration_seconds] | add / length'
+# Calculate average pipeline duration (returns null if no events found)
+docker compose logs --no-log-prefix tomorrow | grep '^{' | jq -s '[.[] | select(.event == "etl_pipeline_completed") | .duration_seconds] | if length > 0 then add / length else "No pipeline runs found" end'
 
 # Find errors
-docker compose logs tomorrow | jq 'select(.level == "error")'
+docker compose logs --no-log-prefix tomorrow | grep '^{' | jq 'select(.level == "error")'
+
+# View database operations
+docker compose logs --no-log-prefix tomorrow | grep '^{' | jq 'select(.logger_name == "tomorrow.db")'
 ```
 
 ### Log Format

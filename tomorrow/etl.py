@@ -12,7 +12,6 @@ Features:
 - Idempotent operations (safe to re-run)
 """
 
-import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import time
@@ -21,9 +20,10 @@ from typing import List, Optional
 from tomorrow.client import TomorrowClient, TomorrowAPIError, TomorrowAPIRateLimitError
 from tomorrow.db import get_active_locations, insert_readings
 from tomorrow.models import Location, WeatherReading, TimelinesResponse
+from tomorrow.observability import get_logger
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -129,8 +129,10 @@ def transform_timeline_to_readings(
                 readings.append(reading)
 
     logger.debug(
-        f"transformed_readings location_id={location.id} "
-        f"granularity={granularity} count={len(readings)}"
+        "transformed_readings",
+        location_id=location.id,
+        granularity=granularity,
+        count=len(readings),
     )
 
     return readings
@@ -198,7 +200,7 @@ def run_etl_pipeline(
         if locations is None:
             logger.info("loading_active_locations_from_db")
             locations = get_active_locations()
-            logger.info(f"loaded_locations count={len(locations)}")
+            logger.info("loaded_locations", count=len(locations))
 
         if not locations:
             logger.warning("no_locations_to_process")
@@ -226,9 +228,12 @@ def run_etl_pipeline(
         end_time_str = end_time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         logger.info(
-            f"etl_pipeline_started locations={len(locations)} "
-            f"granularity={granularity} timesteps={timesteps} "
-            f"start={start_time_str} end={end_time_str}"
+            "etl_pipeline_started",
+            locations=len(locations),
+            granularity=granularity,
+            timesteps=timesteps,
+            start=start_time_str,
+            end=end_time_str,
         )
 
         # Fetch weather data for all locations
@@ -238,13 +243,15 @@ def run_etl_pipeline(
         for i, location in enumerate(locations):
             # Add delay between requests to avoid rate limiting (skip first request)
             if i > 0:
-                logger.debug("rate_limit_delay seconds=3")
+                logger.debug("rate_limit_delay", seconds=3)
                 time.sleep(3)
 
             try:
                 logger.debug(
-                    f"fetching_weather location_id={location.id} "
-                    f"lat={location.lat} lon={location.lon}"
+                    "fetching_weather",
+                    location_id=location.id,
+                    lat=location.lat,
+                    lon=location.lon,
                 )
 
                 response = client.fetch_weather(
@@ -267,15 +274,20 @@ def run_etl_pipeline(
                 locations_processed += 1
 
                 logger.debug(
-                    f"transformed_readings location_id={location.id} "
-                    f"count={len(readings)}"
+                    "transformed_readings",
+                    location_id=location.id,
+                    count=len(readings),
                 )
 
             except TomorrowAPIRateLimitError:
                 locations_failed += 1
                 error_msg = f"Rate limit hit at location {location.id} - stopping to preserve quota"
                 errors.append(error_msg)
-                logger.warning(error_msg)
+                logger.warning(
+                    "rate_limit_hit",
+                    location_id=location.id,
+                    message="stopping to preserve quota",
+                )
                 rate_limited = True
                 # Stop processing - save what we have so far
                 break
@@ -284,20 +296,22 @@ def run_etl_pipeline(
                 locations_failed += 1
                 error_msg = f"API error for location {location.id}: {e}"
                 errors.append(error_msg)
-                logger.error(error_msg)
+                logger.error("api_error", location_id=location.id, error=str(e))
                 # Continue with other locations
                 continue
             except Exception as e:
                 locations_failed += 1
                 error_msg = f"Unexpected error for location {location.id}: {e}"
                 errors.append(error_msg)
-                logger.error(error_msg)
+                logger.error("unexpected_error", location_id=location.id, error=str(e))
                 # Continue with other locations
                 continue
 
         if rate_limited:
             logger.warning(
-                f"etl_pipeline_rate_limited - processed {locations_processed} of {len(locations)} locations"
+                "etl_pipeline_rate_limited",
+                locations_processed=locations_processed,
+                total_locations=len(locations),
             )
 
         # ======================================================================
@@ -306,21 +320,21 @@ def run_etl_pipeline(
 
         if all_readings:
             try:
-                logger.info(f"inserting_readings count={len(all_readings)}")
+                logger.info("inserting_readings", count=len(all_readings))
                 insert_readings(all_readings)
                 readings_inserted = len(all_readings)
-                logger.info(f"inserted_readings count={readings_inserted}")
+                logger.info("inserted_readings", count=readings_inserted)
             except Exception as e:
                 error_msg = f"Database insert failed: {e}"
                 errors.append(error_msg)
-                logger.error(error_msg)
+                logger.error("database_insert_failed", error=str(e))
         else:
             logger.warning("no_readings_to_insert")
 
     except Exception as e:
         error_msg = f"Pipeline failed: {e}"
         errors.append(error_msg)
-        logger.error(error_msg)
+        logger.error("pipeline_failed", error=str(e))
 
     finally:
         # Clean up client if we created it
@@ -332,15 +346,22 @@ def run_etl_pipeline(
     duration_seconds = (completed_at - started_at).total_seconds()
 
     # Log completion
-    log_level = logging.INFO if locations_failed == 0 else logging.WARNING
-    logger.log(
-        log_level,
-        f"etl_pipeline_completed "
-        f"locations_processed={locations_processed} "
-        f"locations_failed={locations_failed} "
-        f"readings_inserted={readings_inserted} "
-        f"duration_seconds={duration_seconds:.2f}",
-    )
+    if locations_failed == 0:
+        logger.info(
+            "etl_pipeline_completed",
+            locations_processed=locations_processed,
+            locations_failed=locations_failed,
+            readings_inserted=readings_inserted,
+            duration_seconds=round(duration_seconds, 2),
+        )
+    else:
+        logger.warning(
+            "etl_pipeline_completed",
+            locations_processed=locations_processed,
+            locations_failed=locations_failed,
+            readings_inserted=readings_inserted,
+            duration_seconds=round(duration_seconds, 2),
+        )
 
     return ETLResult(
         locations_processed=locations_processed,

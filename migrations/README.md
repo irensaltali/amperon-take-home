@@ -21,7 +21,7 @@ Each migration consists of two files:
 
 ### Example Migration
 
-**001_create_locations_table.sql**:
+**creating_example_table.sql**:
 ```sql
 --
 -- Migration: Create locations table
@@ -36,7 +36,7 @@ CREATE TABLE locations (
 CREATE INDEX idx_name ON locations(name);
 ```
 
-**001_create_locations_table.rollback.sql**:
+**creating_example_table.rollback.sql**:
 ```sql
 --
 -- Rollback: Drop locations table
@@ -46,6 +46,18 @@ DROP TABLE IF EXISTS locations CASCADE;
 ```
 
 ## Running Migrations
+
+### Standard Usage
+
+The primary way to run migrations in production/dev is via the main application CLI:
+
+```bash
+python -m tomorrow migrate
+```
+
+### Advanced Usage (Status, Rollback)
+
+For advanced operations like checking status or rolling back, use the migrations module directly:
 
 ### Apply all pending migrations:
 ```bash
