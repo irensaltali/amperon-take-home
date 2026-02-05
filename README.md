@@ -55,10 +55,8 @@ TOMORROW_API_KEY=your_api_key_here
 
 ```bash
 # Start database and scheduler
+# Migrations run automatically on first start
 docker compose up -d
-
-# Run migrations (first time only)
-docker compose --profile migrate run --rm tomorrow-migrate
 ```
 
 ### 3. Verify Installation
@@ -101,14 +99,11 @@ python -m tomorrow migrate
 ### Docker Commands
 
 ```bash
-# Start all services
+# Start all services (migrations run automatically)
 docker compose up -d
 
 # View logs
 docker compose logs -f tomorrow
-
-# Run migrations
-docker compose --profile migrate run --rm tomorrow-migrate
 
 # Start Jupyter for analysis
 docker compose --profile jupyter up -d
