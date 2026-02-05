@@ -15,11 +15,13 @@ Features:
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import time
 from typing import List, Optional
 
-from tomorrow.client import TomorrowClient, TomorrowAPIError
+from tomorrow.client import TomorrowClient, TomorrowAPIError, TomorrowAPIRateLimitError
 from tomorrow.db import get_active_locations, insert_readings
 from tomorrow.models import Location, WeatherReading, TimelinesResponse
+
 
 logger = logging.getLogger(__name__)
 
@@ -67,56 +69,64 @@ def transform_timeline_to_readings(
     Args:
         location: The location for this data
         response: API response with timelines
-        granularity: Data granularity (minutely, hourly, daily)
+        granularity: Data granularity (minutely, hourly, daily) - maps to timestep
 
     Returns:
         List of WeatherReading models ready for database insertion
     """
     readings = []
 
-    # Get the appropriate timeline
-    timeline = response.timelines.get(granularity, [])
+    # Map granularity to timestep format used by API
+    timestep_map = {
+        "minutely": "1m",
+        "hourly": "1h",
+        "daily": "1d",
+    }
+    target_timestep = timestep_map.get(granularity, "1h")
 
-    for entry in timeline:
-        values = entry.values
+    # Find the timeline matching our requested granularity
+    for timeline in response.data.timelines:
+        if timeline.timestep == target_timestep:
+            for interval in timeline.intervals:
+                values = interval.values
 
-        reading = WeatherReading(
-            location_id=location.id,
-            timestamp=entry.time,
-            temperature=values.temperature,
-            temperature_apparent=values.temperature_apparent,
-            wind_speed=values.wind_speed,
-            wind_gust=values.wind_gust,
-            wind_direction=values.wind_direction,
-            humidity=values.humidity,
-            dew_point=values.dew_point,
-            cloud_cover=values.cloud_cover,
-            cloud_base=values.cloud_base,
-            cloud_ceiling=values.cloud_ceiling,
-            visibility=values.visibility,
-            precipitation_probability=values.precipitation_probability,
-            rain_intensity=values.rain_intensity,
-            rain_accumulation=values.rain_accumulation,
-            freezing_rain_intensity=values.freezing_rain_intensity,
-            sleet_intensity=values.sleet_intensity,
-            sleet_accumulation=values.sleet_accumulation,
-            sleet_accumulation_lwe=values.sleet_accumulation_lwe,
-            snow_intensity=values.snow_intensity,
-            snow_accumulation=values.snow_accumulation,
-            snow_accumulation_lwe=values.snow_accumulation_lwe,
-            snow_depth=values.snow_depth,
-            ice_accumulation=values.ice_accumulation,
-            ice_accumulation_lwe=values.ice_accumulation_lwe,
-            evapotranspiration=values.evapotranspiration,
-            pressure_sea_level=values.pressure_sea_level,
-            pressure_surface_level=values.pressure_surface_level,
-            altimeter_setting=values.altimeter_setting,
-            weather_code=values.weather_code,
-            uv_index=values.uv_index,
-            uv_health_concern=values.uv_health_concern,
-            data_granularity=granularity,
-        )
-        readings.append(reading)
+                reading = WeatherReading(
+                    location_id=location.id,
+                    timestamp=interval.start_time,
+                    temperature=values.temperature,
+                    temperature_apparent=values.temperature_apparent,
+                    wind_speed=values.wind_speed,
+                    wind_gust=values.wind_gust,
+                    wind_direction=values.wind_direction,
+                    humidity=values.humidity,
+                    dew_point=values.dew_point,
+                    cloud_cover=values.cloud_cover,
+                    cloud_base=values.cloud_base,
+                    cloud_ceiling=values.cloud_ceiling,
+                    visibility=values.visibility,
+                    precipitation_probability=values.precipitation_probability,
+                    rain_intensity=values.rain_intensity,
+                    rain_accumulation=values.rain_accumulation,
+                    freezing_rain_intensity=values.freezing_rain_intensity,
+                    sleet_intensity=values.sleet_intensity,
+                    sleet_accumulation=values.sleet_accumulation,
+                    sleet_accumulation_lwe=values.sleet_accumulation_lwe,
+                    snow_intensity=values.snow_intensity,
+                    snow_accumulation=values.snow_accumulation,
+                    snow_accumulation_lwe=values.snow_accumulation_lwe,
+                    snow_depth=values.snow_depth,
+                    ice_accumulation=values.ice_accumulation,
+                    ice_accumulation_lwe=values.ice_accumulation_lwe,
+                    evapotranspiration=values.evapotranspiration,
+                    pressure_sea_level=values.pressure_sea_level,
+                    pressure_surface_level=values.pressure_surface_level,
+                    altimeter_setting=values.altimeter_setting,
+                    weather_code=values.weather_code,
+                    uv_index=values.uv_index,
+                    uv_health_concern=values.uv_health_concern,
+                    data_granularity=granularity,
+                )
+                readings.append(reading)
 
     logger.debug(
         f"transformed_readings location_id={location.id} "
@@ -223,8 +233,14 @@ def run_etl_pipeline(
 
         # Fetch weather data for all locations
         all_readings: List[WeatherReading] = []
+        rate_limited = False
 
-        for location in locations:
+        for i, location in enumerate(locations):
+            # Add delay between requests to avoid rate limiting (skip first request)
+            if i > 0:
+                logger.debug("rate_limit_delay seconds=3")
+                time.sleep(3)
+
             try:
                 logger.debug(
                     f"fetching_weather location_id={location.id} "
@@ -255,6 +271,15 @@ def run_etl_pipeline(
                     f"count={len(readings)}"
                 )
 
+            except TomorrowAPIRateLimitError as e:
+                locations_failed += 1
+                error_msg = f"Rate limit hit at location {location.id} - stopping to preserve quota"
+                errors.append(error_msg)
+                logger.warning(error_msg)
+                rate_limited = True
+                # Stop processing - save what we have so far
+                break
+
             except TomorrowAPIError as e:
                 locations_failed += 1
                 error_msg = f"API error for location {location.id}: {e}"
@@ -269,6 +294,11 @@ def run_etl_pipeline(
                 logger.error(error_msg)
                 # Continue with other locations
                 continue
+
+        if rate_limited:
+            logger.warning(
+                f"etl_pipeline_rate_limited - processed {locations_processed} of {len(locations)} locations"
+            )
 
         # ======================================================================
         # LOAD: Insert readings into database

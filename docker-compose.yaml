@@ -21,9 +21,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    # 1. Run migrations, 2. Fetch initial data, 3. Start scheduler
+    # 1. Run migrations, 2. Start scheduler (fetches data hourly)
+    # NOTE: We don't do an initial fetch to avoid rate limit issues on restarts
     command: >
-      sh -c "python -m tomorrow migrate && python -m tomorrow run && python -m tomorrow scheduler"
+      sh -c "python -m tomorrow migrate && python -m tomorrow scheduler"
     environment:
       # From .env (user-configurable)
       TOMORROW_API_KEY: ${TOMORROW_API_KEY}

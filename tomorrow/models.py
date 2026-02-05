@@ -159,18 +159,59 @@ class TimelineEntry(BaseModel):
     )
 
 
-class TimelinesResponse(BaseModel):
-    """Root response structure from Tomorrow.io /timelines API.
+class TimelineInterval(BaseModel):
+    """A single interval from Tomorrow.io API timeline.
 
-    Contains timelines for different granularities (minutely, hourly, daily).
-    Each timeline is a list of timeline entries with timestamps and values.
+    Contains a start time and the weather values for that interval.
     """
 
     model_config = ConfigDict(populate_by_name=True)
 
-    timelines: dict[Literal["minutely", "hourly", "daily"], list[TimelineEntry]] = (
-        Field(..., alias="timelines", description="Weather timelines by granularity")
+    start_time: datetime = Field(
+        ..., alias="startTime", description="Start time of the interval (ISO 8601)"
     )
+    values: TimelineValues = Field(
+        ..., alias="values", description="Weather values for this interval"
+    )
+
+
+class Timeline(BaseModel):
+    """A single timeline from Tomorrow.io API.
+
+    Contains timestep info and array of intervals.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    timestep: str = Field(..., description="Timestep of the timeline (e.g., '1h')")
+    start_time: datetime = Field(
+        ..., alias="startTime", description="Start time of the timeline"
+    )
+    end_time: datetime = Field(
+        ..., alias="endTime", description="End time of the timeline"
+    )
+    intervals: list[TimelineInterval] = Field(
+        ..., description="List of weather intervals"
+    )
+
+
+class TimelinesData(BaseModel):
+    """Data container for timelines response."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    timelines: list[Timeline] = Field(..., description="List of timelines")
+
+
+class TimelinesResponse(BaseModel):
+    """Root response structure from Tomorrow.io /timelines API.
+
+    The actual API returns: {"data": {"timelines": [...]}}
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    data: TimelinesData = Field(..., description="Data container with timelines")
 
 
 # ============================================================================
