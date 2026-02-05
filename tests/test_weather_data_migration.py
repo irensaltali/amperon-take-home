@@ -363,6 +363,45 @@ class TestDataInsertion:
             db_conn.commit()
         db_conn.rollback()
 
+    def test_upsert_behavior(self, db_conn, cursor, sample_location_id):
+        """Should update existing record when using ON CONFLICT."""
+        timestamp = datetime(2024, 6, 1, 16, 0, 0, tzinfo=timezone.utc)
+
+        # Initial insert
+        cursor.execute(
+            """
+            INSERT INTO weather_data (
+                location_id, timestamp, data_granularity, temperature
+            ) VALUES (%s, %s, 'hourly', 25.0);
+            """,
+            (sample_location_id, timestamp),
+        )
+        db_conn.commit()
+
+        # Upsert (update temperature)
+        cursor.execute(
+            """
+            INSERT INTO weather_data (
+                location_id, timestamp, data_granularity, temperature
+            ) VALUES (%s, %s, 'hourly', 30.0)
+            ON CONFLICT (location_id, timestamp, data_granularity) 
+            DO UPDATE SET temperature = EXCLUDED.temperature;
+            """,
+            (sample_location_id, timestamp),
+        )
+        db_conn.commit()
+
+        # Verify update
+        cursor.execute(
+            """
+            SELECT temperature FROM weather_data 
+            WHERE location_id = %s AND timestamp = %s;
+            """,
+            (sample_location_id, timestamp),
+        )
+        result = cursor.fetchone()
+        assert result["temperature"] == Decimal("30.00")
+
     def test_different_granularity_same_timestamp_allowed(
         self, db_conn, cursor, sample_location_id
     ):
