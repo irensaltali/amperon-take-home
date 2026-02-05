@@ -14,12 +14,12 @@ A production-grade weather data ingestion system that fetches data from Tomorrow
 │  Tomorrow.io    │────▶│  Python ETL      │────▶│  PostgreSQL     │
 │  API (Free)     │     │  (Containerized) │     │  (Time-series)  │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
-                                │
-                                ▼
-                       ┌──────────────────┐
-                       │  Jupyter Notebook│
-                       │  (Analysis)      │
-                       └──────────────────┘
+                                                         │
+                                                         ▼
+                                                ┌──────────────────┐
+                                                │  Jupyter Notebook│
+                                                │  (Analysis)      │
+                                                └──────────────────┘
 ```
 
 ## Design Decisions & Rationale
@@ -59,7 +59,7 @@ A production-grade weather data ingestion system that fetches data from Tomorrow
 ### Prerequisites
 
 - Docker & Docker Compose
-- Tomorrow.io API key ([get one free](https://www.tomorrow.io/))
+- [Tomorrow.io](https://www.tomorrow.io/) API key 
 
 ### 1. Clone and Configure
 
@@ -110,7 +110,9 @@ After `docker compose up -d`, the following services are available:
 
 ### Notebook Analysis
 
-The `analysis.ipynb` notebook includes:
+The `analysis.ipynb` notebook can be used to visualize and explore the collected weather data. You can access it via the web interface at `http://localhost:8888`, or by opening the `analysis.ipynb` file directly in your local IDE (e.g. VS Code) and connecting to the running kernel at `http://localhost:8888`.
+
+The notebook includes:
 - **Query 1**: Latest temperature and wind speed by location
 - **Query 2**: Hourly time series analysis (-1 day to +5 days)
 - **Comparative Analysis**: Temperature variations across all 10 locations
@@ -244,14 +246,14 @@ python scripts/audit.py
 | `PGPORT` | No | 5432 | Database port |
 | `PGDATABASE` | No | tomorrow | Database name |
 | `PGUSER` | No | postgres | Database user |
-| `PGPASSWORD` | Yes | - | Database password |
+| `PGPASSWORD` | Yes | postgres | Database password |
 | `LOG_LEVEL` | No | INFO | Logging level |
 
 ## Testing
 
 The project includes comprehensive tests:
 
-- **Unit Tests**: 210 tests covering all modules
+- **Unit Tests**: 206 tests covering all modules
 - **E2E Tests**: Integration tests with database
 - **Migration Tests**: Database schema validation
 
@@ -328,7 +330,7 @@ Required secrets:
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License - see [LICENSE](LICENSE) file for details
 
 ## Acknowledgments
 
