@@ -55,7 +55,10 @@ TOMORROW_API_KEY=your_api_key_here
 
 ```bash
 # Start all services (database, ETL pipeline, Jupyter notebook)
-# Migrations run automatically on first start
+# On first start:
+#   1. Database migrations run automatically
+#   2. Initial data fetch from Tomorrow.io API
+#   3. Scheduler starts for hourly updates
 docker compose up -d
 ```
 
@@ -112,7 +115,10 @@ python -m tomorrow migrate
 ### Docker Commands
 
 ```bash
-# Start all services (migrations run automatically)
+# Start all services
+# - Migrations run automatically
+# - Initial data fetch from API (fills database immediately)
+# - Scheduler starts for hourly updates
 docker compose up -d
 
 # View ETL logs

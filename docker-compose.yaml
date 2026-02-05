@@ -21,9 +21,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    # Run migrations first, then start scheduler
+    # 1. Run migrations, 2. Fetch initial data, 3. Start scheduler
     command: >
-      sh -c "python -m tomorrow migrate && python -m tomorrow scheduler"
+      sh -c "python -m tomorrow migrate && python -m tomorrow run && python -m tomorrow scheduler"
     environment:
       # From .env (user-configurable)
       TOMORROW_API_KEY: ${TOMORROW_API_KEY}
