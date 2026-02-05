@@ -7,16 +7,16 @@ Example log output:
     {
         "timestamp": "2024-01-15T10:30:00Z",
         "level": "info",
-        "event": "pipeline_completed",
+        "event": "etl_pipeline_completed",
         "locations_processed": 10,
         "readings_inserted": 1440,
         "duration_seconds": 45.2
     }
 
-View logs:
-    docker compose logs tomorrow | jq .
-    docker compose logs tomorrow | jq 'select(.event == "pipeline_completed")'
-    docker compose logs tomorrow | jq -s '[.[] | select(.event == "pipeline_completed") | .duration_seconds] | add / length'
+View logs (use --no-log-prefix to remove container prefix, grep '^{' to filter JSON lines):
+    docker compose logs --no-log-prefix tomorrow | grep '^{' | jq .
+    docker compose logs --no-log-prefix tomorrow | grep '^{' | jq 'select(.event == "etl_pipeline_completed")'
+    docker compose logs --no-log-prefix tomorrow | grep '^{' | jq -s '[.[] | select(.event == "etl_pipeline_completed") | .duration_seconds] | if length > 0 then add / length else "No pipeline runs found" end'
 """
 
 import logging
@@ -25,10 +25,14 @@ from typing import Any
 
 import structlog
 
+# Track if logging has been configured
+_logging_configured = False
+
 
 def configure_logging(
     log_level: str = "INFO",
     json_format: bool = True,
+    _silent: bool = False,
 ) -> None:
     """Configure structured logging with structlog.
 
@@ -38,7 +42,9 @@ def configure_logging(
     Args:
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
         json_format: If True, output JSON; if False, output plain text
+        _silent: If True, don't log the "logging_configured" message (internal use)
     """
+    global _logging_configured
     # Configure standard library logging
     logging.basicConfig(
         format="%(message)s",
@@ -97,14 +103,17 @@ def configure_logging(
     # Update root logger
     root_logger = logging.getLogger()
     root_logger.handlers = [handler]
+    # Mark as configured
+    _logging_configured = True
 
-    # Get logger and log configuration
-    logger = structlog.get_logger()
-    logger.info(
-        "logging_configured",
-        log_level=log_level,
-        json_format=json_format,
-    )
+    # Get logger and log configuration (unless silent)
+    if not _silent:
+        logger = structlog.get_logger()
+        logger.info(
+            "logging_configured",
+            log_level=log_level,
+            json_format=json_format,
+        )
 
 
 def get_logger(name: str | None = None) -> Any:
@@ -261,3 +270,9 @@ def log_db_operation(
         duration_ms=round(duration_ms, 2),
         **extra,
     )
+
+
+# Initialize logging with JSON format at module import time
+# This ensures all early logs (before explicit configure_logging call) are in JSON format
+if not _logging_configured:
+    configure_logging(log_level="INFO", json_format=True, _silent=True)
