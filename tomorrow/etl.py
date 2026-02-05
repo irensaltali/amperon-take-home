@@ -18,7 +18,7 @@ import time
 from typing import List, Optional
 
 from tomorrow.client import TomorrowClient, TomorrowAPIError, TomorrowAPIRateLimitError
-from tomorrow.db import get_active_locations, insert_readings
+from tomorrow.db import get_active_locations, insert_readings, get_latest_by_location
 from tomorrow.models import Location, WeatherReading, TimelinesResponse
 from tomorrow.observability import get_logger
 
@@ -402,3 +402,62 @@ def run_minutely_pipeline() -> ETLResult:
         granularity="minutely",
         timesteps="1m",
     )
+
+
+def check_and_run_initial_fetch() -> None:
+    """Check if we have recent data, and if not, run the pipeline.
+
+    This ensures that when the service starts up, we don't wait for the next
+    scheduled hour to get data if we are missing the current/latest data.
+    """
+    logger.info("checking_initial_data")
+
+    # 1. Get active locations count
+    active_locations = get_active_locations()
+    if not active_locations:
+        logger.warning("no_active_locations_found_skipping_check")
+        return
+
+    # 2. Get latest hourly readings
+    latest_readings = get_latest_by_location(granularity="hourly")
+
+    # 3. Check for missing data
+    should_run = False
+    now = datetime.now(timezone.utc)
+
+    # Condition A: Some locations have no data at all
+    if len(latest_readings) < len(active_locations):
+        logger.info(
+            "missing_data_for_some_locations",
+            active_count=len(active_locations),
+            found_count=len(latest_readings),
+        )
+        should_run = True
+    else:
+        # Condition B: Data is stale (older than 1 hour)
+        # We use strict 1 hour check to catch missed scheduled runs immediately
+        cutoff_time = now - timedelta(hours=1)
+
+        for reading in latest_readings:
+            # reading.timestamp is already timezone-aware from DB (if configured correctly)
+            # or naive. If naive, assume UTC.
+            ts = reading.timestamp
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+
+            if ts < cutoff_time:
+                logger.info(
+                    "stale_data_found",
+                    location_id=reading.location_id,
+                    timestamp=ts.isoformat(),
+                    cutoff=cutoff_time.isoformat(),
+                )
+                should_run = True
+                break
+
+    if should_run:
+        logger.info("starting_initial_fetch_due_to_missing_data")
+        # Run standard hourly pipeline
+        run_hourly_pipeline()
+    else:
+        logger.info("data_is_fresh_skipping_initial_fetch")
