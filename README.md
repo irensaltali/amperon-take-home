@@ -22,6 +22,29 @@ A production-grade weather data ingestion system that fetches data from Tomorrow
                        └──────────────────┘
 ```
 
+## Design Decisions & Rationale
+
+| Component | Choice | Rationale |
+|-----------|--------|-----------|
+| **Language** | Python 3.11 | Requested by assignment. Used Pydantic for strong type validation which is crucial for robust data engineering pipelines. |
+| **Database** | PostgreSQL | Robust, standard relational database perfect for structured weather data. Used raw SQL (`psycopg2`) over ORMs for better performance control and "closer to the metal" understanding, as strictly requested "data engineering" skills often prefer SQL visibility. |
+| **Scheduling** | APScheduler | Lightweight, in-process scheduler. Chosen over Airflow/Celery to keep the system "small" and self-contained (single container option) as per assignment scope, avoiding deployment complexity overhead. |
+| **Observability** | Structlog | Production-grade structured logging is essential for modern data stacks. Enables log analysis with tools like `jq` or ingestion into ELK/Datadog without parsing overhead. |
+| **API Client** | Custom + Tenacity | Built a robust custom client with `tenacity` for exponential backoff retries. This handles API flakes more reliably than simple `requests` calls. |
+| **Migrations** | Yoyo Migrations | Lightweight, raw SQL migration tool. Chosen because full ORM migrations (Alembic) were unnecessary since we aren't using an ORM for queries. |
+
+## Trade-offs & Assumptions
+
+- **Single Table Design**: I chose a denormalized `weather_data` table design where all metrics (temperature, wind, etc.) are columns.
+  - *Trade-off*: Adding new metrics requires schema migration (DDL).
+  - *Benefit*: Query patterns are almost exclusively "get all metrics for time range", so this avoids expensive joins and simplifies ingestion.
+- **Handling API Limits**: The Free Tier has strict rate limits.
+  - *Assumption*: We prioritize data continuity over real-time precision. The scheduler is set to hourly to comfortably stay within limits.
+  - *Mitigation*: Implemented a "fetcher" design that can easily scale, but throttled it intentionally.
+- **Data Granularity**: Storing granular data vs aggregates.
+  - *Decision*: Storing raw hourly data. We can compute aggregates (daily max/min) on read-time via SQL (as shown in analysis queries) rather than ETL-time, preserving raw data fidelity.
+
+
 ## Features
 
 - **No Hardcoded Locations**: 10 geolocations stored in database via migrations
