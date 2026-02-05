@@ -69,8 +69,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    profiles:
-      - jupyter
     restart: unless-stopped
 
 volumes:
