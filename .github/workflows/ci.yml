@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16.2
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tomorrow
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run migrations
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGDATABASE: tomorrow
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          pip install yoyo-migrations
+          yoyo apply --database postgresql://postgres:postgres@localhost:5432/tomorrow ./migrations
+
+      - name: Run tests
+        env:
+          TOMORROW_API_KEY: test_api_key_for_ci
+          PGHOST: localhost
+          PGPORT: 5432
+          PGDATABASE: tomorrow
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          python -m pytest tests/ -v --tb=short
+
+      - name: Upload coverage report
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            .pytest_cache/
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install linting tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Run Ruff linter
+        run: |
+          ruff check tomorrow/ --ignore E501
+
+      - name: Run Ruff formatter check
+        run: |
+          ruff format tomorrow/ --check
